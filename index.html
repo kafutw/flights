@@ -1,0 +1,218 @@
+<!doctype html>
+<html lang="zh-Hant"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta http-equiv="refresh" content="1800">
+<meta name="robots" content="noindex,nofollow">
+<title>東京機票監控</title>
+<style>
+:root{color-scheme:light;--bg:#f4f3f0;--surface:#fcfcfb;--line:#e4e2dc;--grid:#ecebe7;
+ --ink:#0b0b0b;--ink2:#52514e;--ink3:#7a7974;--s1:#2a78d6;--s2:#eb6834;--good:#0ca30c;--bad:#d03b3b;
+ --q1:#cde2fb;--q2:#9ec5f4;--q3:#6da7ec;--q4:#3987e5;--q5:#256abf;--q6:#184f95}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){color-scheme:dark;--bg:#121211;--surface:#1a1a19;
+ --line:#2e2e2c;--grid:#262624;--ink:#fff;--ink2:#c3c2b7;--ink3:#8e8d86;--s1:#3987e5;--s2:#d95926;
+ --q1:#104281;--q2:#184f95;--q3:#1c5cab;--q4:#2a78d6;--q5:#5598e7;--q6:#86b6ef}}
+:root[data-theme="dark"]{color-scheme:dark;--bg:#121211;--surface:#1a1a19;--line:#2e2e2c;--grid:#262624;--ink:#fff;
+ --ink2:#c3c2b7;--ink3:#8e8d86;--s1:#3987e5;--s2:#d95926;--q1:#104281;--q2:#184f95;--q3:#1c5cab;--q4:#2a78d6;--q5:#5598e7;--q6:#86b6ef}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.6 -apple-system,"PingFang TC","Noto Sans TC",sans-serif}
+.wrap{max-width:1080px;margin:0 auto;padding:24px 16px 48px}
+h1{font-size:22px;margin:0 0 4px}
+.sub{color:var(--ink2);font-size:13px;margin:0 0 20px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:16px 18px;margin-bottom:16px}
+h2{font-size:16px;margin:0 0 4px}
+.note{color:var(--ink3);font-size:12px;margin:0 0 12px}
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(200px,100%),1fr));gap:12px;margin-bottom:16px}
+.tile{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:14px 16px}
+.tile .k{color:var(--ink2);font-size:13px}
+.tile .v{font-size:28px;font-weight:700;letter-spacing:.5px;font-variant-numeric:tabular-nums}
+.tile .d{color:var(--ink2);font-size:13px}
+.up{color:var(--bad)}.down{color:var(--good)}
+.bar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:8px}
+select{font:inherit;padding:4px 8px;border-radius:8px;border:1px solid var(--line);background:var(--surface);color:var(--ink)}
+.legend{display:flex;gap:14px;font-size:13px;color:var(--ink2)}
+.legend i{display:inline-block;width:14px;height:3px;border-radius:2px;vertical-align:middle;margin-right:5px}
+.chart{position:relative}
+svg{display:block;width:100%;height:auto;overflow:visible}
+.tip{position:absolute;pointer-events:none;background:var(--surface);border:1px solid var(--line);border-radius:8px;
+ padding:6px 10px;font-size:13px;box-shadow:0 2px 8px rgba(0,0,0,.12);white-space:nowrap;display:none;z-index:2}
+.scroll{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-variant-numeric:tabular-nums}
+th,td{padding:6px 8px;text-align:right;border-bottom:1px solid var(--grid);font-size:13px;white-space:nowrap}
+th:first-child,td:first-child{text-align:left}
+th{color:var(--ink2);font-weight:600}
+.heat td.c{text-align:center;padding:6px 4px;border:2px solid var(--surface);border-radius:4px;min-width:46px}
+.heat td.best{outline:2px solid var(--ink);outline-offset:-2px;font-weight:700}
+.tag{font-size:11px;color:var(--ink3);margin-left:4px}
+.news a{color:var(--s1);text-decoration:none}.news li{margin-bottom:6px;font-size:14px}
+.news .dt{color:var(--ink3);font-size:12px;margin-right:6px}
+.scale{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--ink3);margin-top:8px}
+.scale span.sw{width:22px;height:10px;border-radius:2px;display:inline-block}
+</style></head><body><div class="wrap">
+<h1>東京機票監控</h1>
+<p class="sub" id="sub"></p>
+<div class="tiles" id="tiles"></div>
+
+<div class="card">
+ <h2>票價走勢</h2>
+ <p class="note">每次掃描取 3/1–3/14 出發中最便宜的一組。5 人總價＝大人價 × 5（估算），含稅、不含託運。</p>
+ <div class="bar"><select id="pick"></select><div class="legend" id="legend"></div></div>
+ <div class="chart" id="trend"><div class="tip" id="tip1"></div></div>
+</div>
+
+<div class="card">
+ <h2>哪一天出發最便宜</h2>
+ <p class="note">最新一次掃描，單位：萬元（5 人來回估計），7 天 6 夜。外框是那一家最便宜的那天，顏色越深越貴。</p>
+ <div class="scroll"><table class="heat" id="heat"></table></div>
+ <div class="scale" id="scale"></div>
+</div>
+
+<div class="card">
+ <h2>各家航空最新價格</h2>
+ <p class="note">跟「開始追蹤時」比；歷史最低是追蹤以來看過最便宜的價格。</p>
+ <div class="scroll"><table id="tbl"></table></div>
+</div>
+
+<div class="card news">
+ <h2>旅展與促銷新聞</h2>
+ <ul id="news" style="padding-left:18px;margin:8px 0 0"></ul>
+</div>
+</div>
+<script>
+const D = {"rows": [["2026-10-14 12:31", "BR", "2027-03-01", 17860], ["2026-10-14 12:31", "BR", "2027-03-02", 18394], ["2026-10-14 12:31", "BR", "2027-03-03", 17860], ["2026-10-14 12:31", "BR", "2027-03-04", 17860], ["2026-10-14 12:31", "BR", "2027-03-05", 17860], ["2026-10-14 12:31", "BR", "2027-03-06", 17860], ["2026-10-14 12:31", "BR", "2027-03-07", 17860], ["2026-10-14 12:31", "BR", "2027-03-08", 17860], ["2026-10-14 12:31", "BR", "2027-03-09", 17860], ["2026-10-14 12:31", "BR", "2027-03-10", 17860], ["2026-10-14 12:31", "BR", "2027-03-11", 17860], ["2026-10-14 12:31", "BR", "2027-03-12", 17860], ["2026-10-14 12:31", "BR", "2027-03-13", 17860], ["2026-10-14 12:31", "BR", "2027-03-14", 17860], ["2026-10-14 12:31", "CI", "2027-03-01", 16293], ["2026-10-14 12:31", "CI", "2027-03-02", 16293], ["2026-10-14 12:31", "CI", "2027-03-03", 16293], ["2026-10-14 12:31", "CI", "2027-03-04", 16533], ["2026-10-14 12:31", "CI", "2027-03-05", 18741], ["2026-10-14 12:31", "CI", "2027-03-06", 16533], ["2026-10-14 12:31", "CI", "2027-03-07", 19839], ["2026-10-14 12:31", "CI", "2027-03-08", 20852], ["2026-10-14 12:31", "CI", "2027-03-09", 16293], ["2026-10-14 12:31", "CI", "2027-03-10", 16293], ["2026-10-14 12:31", "CI", "2027-03-11", 20852], ["2026-10-14 12:31", "CI", "2027-03-12", 20852], ["2026-10-14 12:31", "CI", "2027-03-13", 20852], ["2026-10-14 12:31", "CI", "2027-03-14", 20852], ["2026-10-14 12:31", "JX", "2027-03-01", 18020], ["2026-10-14 12:31", "JX", "2027-03-02", 17108], ["2026-10-14 12:31", "JX", "2027-03-03", 16292], ["2026-10-14 12:31", "JX", "2027-03-04", 16292], ["2026-10-14 12:31", "JX", "2027-03-05", 16292], ["2026-10-14 12:31", "JX", "2027-03-06", 16292], ["2026-10-14 12:31", "JX", "2027-03-07", 17108], ["2026-10-14 12:31", "JX", "2027-03-08", 17108], ["2026-10-14 12:31", "JX", "2027-03-09", 16292], ["2026-10-14 12:31", "JX", "2027-03-10", 16292], ["2026-10-14 12:31", "JX", "2027-03-11", 16292], ["2026-10-14 12:31", "JX", "2027-03-12", 16292], ["2026-10-14 12:31", "JX", "2027-03-13", 16292], ["2026-10-14 12:31", "JX", "2027-03-14", 18020], ["2026-10-14 12:31", "CX", "2027-03-01", 16051], ["2026-10-14 12:31", "CX", "2027-03-02", 15651], ["2026-10-14 12:31", "CX", "2027-03-03", 15401], ["2026-10-14 12:31", "CX", "2027-03-04", 15401], ["2026-10-14 12:31", "CX", "2027-03-05", 15151], ["2026-10-14 12:31", "CX", "2027-03-06", 15651], ["2026-10-14 12:31", "CX", "2027-03-07", 16151], ["2026-10-14 12:31", "CX", "2027-03-08", 16051], ["2026-10-14 12:31", "CX", "2027-03-09", 15651], ["2026-10-14 12:31", "CX", "2027-03-10", 15151], ["2026-10-14 12:31", "CX", "2027-03-11", 15401], ["2026-10-14 12:31", "CX", "2027-03-12", 15401], ["2026-10-14 12:31", "CX", "2027-03-13", 15401], ["2026-10-14 12:31", "CX", "2027-03-14", 16951], ["2026-10-14 12:31", "JL", "2027-03-01", 22679], ["2026-10-14 12:31", "JL", "2027-03-02", 24429], ["2026-10-14 12:31", "JL", "2027-03-03", 24429], ["2026-10-14 12:31", "JL", "2027-03-04", 23579], ["2026-10-14 12:31", "JL", "2027-03-05", 23579], ["2026-10-14 12:31", "JL", "2027-03-06", 23579], ["2026-10-14 12:31", "JL", "2027-03-07", 25179], ["2026-10-14 12:31", "JL", "2027-03-08", 25179], ["2026-10-14 12:31", "JL", "2027-03-09", 24429], ["2026-10-14 12:31", "JL", "2027-03-10", 22679], ["2026-10-14 12:31", "JL", "2027-03-11", 32979], ["2026-10-14 12:31", "JL", "2027-03-12", 22679], ["2026-10-14 12:31", "JL", "2027-03-13", 33879], ["2026-10-14 12:31", "JL", "2027-03-14", 25179], ["2026-10-14 12:31", "NH", "2027-03-14", 58617], ["2026-10-14 12:31", "IT", "2027-03-01", 13588], ["2026-10-14 12:31", "IT", "2027-03-02", 12088], ["2026-10-14 12:31", "IT", "2027-03-03", 12588], ["2026-10-14 12:31", "IT", "2027-03-04", 10988], ["2026-10-14 12:31", "IT", "2027-03-05", 10988], ["2026-10-14 12:31", "IT", "2027-03-06", 11988], ["2026-10-14 12:31", "IT", "2027-03-07", 12488], ["2026-10-14 12:31", "IT", "2027-03-08", 11988], ["2026-10-14 12:31", "IT", "2027-03-09", 11488], ["2026-10-14 12:31", "IT", "2027-03-10", 10988], ["2026-10-14 12:31", "IT", "2027-03-11", 10988], ["2026-10-14 12:31", "IT", "2027-03-12", 10588], ["2026-10-14 12:31", "IT", "2027-03-13", 11088], ["2026-10-14 12:31", "IT", "2027-03-14", 12588], ["2026-10-14 12:31", "MM", "2027-03-01", 13918], ["2026-10-14 12:31", "MM", "2027-03-02", 12528], ["2026-10-14 12:31", "MM", "2027-03-03", 10630], ["2026-10-14 12:31", "MM", "2027-03-04", 9830], ["2026-10-14 12:31", "MM", "2027-03-05", 10630], ["2026-10-14 12:31", "MM", "2027-03-06", 10630], ["2026-10-14 12:31", "MM", "2027-03-07", 10630], ["2026-10-14 12:31", "MM", "2027-03-08", 11518], ["2026-10-14 12:31", "MM", "2027-03-09", 12128], ["2026-10-14 12:31", "MM", "2027-03-10", 10230], ["2026-10-14 12:31", "MM", "2027-03-11", 9830], ["2026-10-14 12:31", "MM", "2027-03-12", 10630], ["2026-10-14 12:31", "MM", "2027-03-13", 10630], ["2026-10-14 12:31", "MM", "2027-03-14", 10066], ["2026-10-14 12:31", "TR", "2027-03-01", 11100], ["2026-10-14 12:31", "TR", "2027-03-02", 10236], ["2026-10-14 12:31", "TR", "2027-03-03", 9666], ["2026-10-14 12:31", "TR", "2027-03-04", 10530], ["2026-10-14 12:31", "TR", "2027-03-05", 10123], ["2026-10-14 12:31", "TR", "2027-03-06", 11100], ["2026-10-14 12:31", "TR", "2027-03-07", 10236], ["2026-10-14 12:31", "TR", "2027-03-08", 11710], ["2026-10-14 12:31", "TR", "2027-03-09", 10236], ["2026-10-14 12:31", "TR", "2027-03-10", 10236], ["2026-10-14 12:31", "TR", "2027-03-11", 11100], ["2026-10-14 12:31", "TR", "2027-03-12", 10530], ["2026-10-14 12:31", "TR", "2027-03-13", 14920], ["2026-10-14 12:31", "TR", "2027-03-14", 12524], ["2026-10-14 12:31", "GK", "2027-03-01", 10326], ["2026-10-14 12:31", "GK", "2027-03-02", 10238], ["2026-10-14 12:31", "GK", "2027-03-03", 9716], ["2026-10-14 12:31", "GK", "2027-03-04", 9296], ["2026-10-14 12:31", "GK", "2027-03-05", 10621], ["2026-10-14 12:31", "GK", "2027-03-06", 10326], ["2026-10-14 12:31", "GK", "2027-03-07", 10926], ["2026-10-14 12:31", "GK", "2027-03-08", 10598], ["2026-10-14 12:31", "GK", "2027-03-09", 9546], ["2026-10-14 12:31", "GK", "2027-03-10", 9241], ["2026-10-14 12:31", "GK", "2027-03-11", 9296], ["2026-10-14 12:31", "GK", "2027-03-12", 9241], ["2026-10-14 12:31", "GK", "2027-03-13", 15558], ["2026-10-14 12:31", "GK", "2027-03-14", 13304], ["2026-10-14 12:31", "SL", "2027-03-01", 16857], ["2026-10-14 12:31", "SL", "2027-03-02", 15857], ["2026-10-14 12:31", "SL", "2027-03-05", 19257], ["2026-10-14 12:31", "SL", "2027-03-08", 12857], ["2026-10-14 12:31", "SL", "2027-03-09", 16257], ["2026-10-14 12:31", "SL", "2027-03-12", 19857]], "airlines": [{"code": "BR", "name": "長榮航空", "lcc": false}, {"code": "CI", "name": "中華航空", "lcc": false}, {"code": "JX", "name": "星宇航空", "lcc": false}, {"code": "CX", "name": "國泰航空", "lcc": false}, {"code": "JL", "name": "日本航空", "lcc": false}, {"code": "NH", "name": "全日空", "lcc": false}, {"code": "IT", "name": "台灣虎航", "lcc": true}, {"code": "MM", "name": "樂桃航空", "lcc": true}, {"code": "TR", "name": "酷航", "lcc": true}, {"code": "GK", "name": "捷星日本", "lcc": true}, {"code": "SL", "name": "泰國獅航", "lcc": true}, {"code": "D7", "name": "亞洲航空X", "lcc": true}], "pax": 5, "paxNote": "3 大 2 小", "built": "2026-10-14 14:03", "next": "10/14 14:30", "news": [{"title": "ANA日本機票限時優惠！來回連稅$3,000起 可免費加日本國內航段！ - U Travel", "link": "https://news.google.com/rss/articles/CBMi8wJBVV95cUxNQ3lweGhKRW15b0d6ZkhVSmlsdEthcEhjV1lZNFpncy1sMFU3TFhsVzJ2Wnd4cGs0RFhxU2hhU20zSjJkTjhyNFQ5Y215aHQxWFhZRjNramRSZVFaa21wMUxBaHpmelJfSEZldkVvRW95ZWg1alpKR2xSS1hJODNiZ0lxX1ByaXBuTi1zZF9HR2l4MlhoZVgwN0tkUFB6aTFGcDN6VVN2aVQ3dDU1aXlCVnFuZThpZG9hUmE3cWJINFF4dXhQeTd6dGVoUWlBVy1kVE84U0RTbmtIOXVaYy1WR2JnXzlsVHVVWW9Vc0RoMlhQWXZSVHVDZWRGaG5SNVlnMkI5ZHdsSlNmTmJOTUliQ0RnT2FpR0VfZGRBQ2RfQS1fdzJOOVIyNWNreW43cTdfWXA5X2gxMGdBRk1QZHNIcFhLajUwNDJwTjIyT1FhdndPdVk4SXFydXNBMWNiRk5SaldnOFpNaWNiTEN1UTlxWFVzWQ?oc=5", "date": "Mon, 12 Oct 2026", "found": "10/14 12:31"}, {"title": "AI找2027過年機票比較便宜？三工具實測給答案、附找票指令 - 遠見雜誌", "link": "https://news.google.com/rss/articles/CBMiTkFVX3lxTFBMSXphdUt1MVBoTnNaWjJlNC1wb3RuLV9QQV9pcmp2MzB2X2tLVGIxdHRSV3dTakZGYTdkem1oM1hpN1BlSjBCS1dDT29Hdw?oc=5", "date": "Thu, 08 Oct 2026", "found": "10/14 12:31"}, {"title": "Club Med線上旅展開跑！石垣島含機票2.82萬起　2027暑假早鳥最低6折 - UDN", "link": "https://news.google.com/rss/articles/CBMiVkFVX3lxTFBxTElPSFgxdzRGTEQyeUFaSnNCLThjVEFWVTl0UDE5ZW0zYzBWN0cycjhmUUpQZlBoYVZ5WUQzOEliaDhycUdLbTVWSjBGSHFUbk5CRDVR0gFWQVVfeXFMUHFMSU9IWDF3NEZMRDJ5QVpKc0ItOGNUQVZVOXRQMTllbTNjMFY3RzJyOGZRSlBmUGhhVnlZRDM4SWJoOHJxR0ttNVZKMEZIcVRuTkJENVE?oc=5", "date": "Wed, 14 Oct 2026", "found": "10/14 12:31"}, {"title": "可樂旅遊x土耳其航空航限時優惠！88折起 - 鏡週刊Mirror Media", "link": "https://news.google.com/rss/articles/CBMiXEFVX3lxTE9RZTJVRDJUVDNsN3RNTW9jSGFUazhRZGUzTEc1aUpsaHI1VmVFWUlNOGNTLVJEVU0tLXVObl9oOThwQi1vYVdvekMwWVpxNXY2Z1pRcWhRMDlRZzE0?oc=5", "date": "Mon, 12 Oct 2026", "found": "10/14 12:31"}, {"title": "釜山5日2萬有找！線上旅展限時優惠　香港住宿一口價888元 - ETtoday旅遊雲", "link": "https://news.google.com/rss/articles/CBMiWkFVX3lxTE15SjF0Q2dEU1VhS1dDMEVZQjNXdURqMEdRQmswZklzTm9yZFN1clI3STJVMGd6SklpbDNKM0tzdFQ1bTNhbVkyUjd5ajBWRDNTRmhHT1p1azJBQdIBT0FVX3lxTFBtMC0yUmRUQjR2S2N3WDJiRUJCaU5yTnZadmhuNHpJd1RoT2J6YWk0b21Sc0NkN0F0SDgxNU9adlcwSUZEcDF5d1FiTF9ycUE?oc=5", "date": "Mon, 12 Oct 2026", "found": "10/14 12:31"}, {"title": "冬季訂單增3成雄獅加碼多項優惠可樂旅遊推土耳其航空全線88折起- 旅遊新聞 - PChome Online 新聞", "link": "https://news.google.com/rss/articles/CBMiiAFBVV95cUxNNm94QTFMOWlGVnlpRFBQMTFCMDBjWVQ1dUttU3JfeEtFaTFnR29FLVlqbGRoUFdOR003VkVUNmk4VnlwQ1NRaV9ySTFNR0tnTkU2dkhma041S3pyYTJVMzNQc0ZVM2NJS0RFc0RPSTBUMU9vUERUM0hPX2g1YU1QNnNTczE0b0RZ?oc=5", "date": "Mon, 12 Oct 2026", "found": "10/14 12:31"}, {"title": "ITF 旅展搶客戰提前開打！旅行社冬遊訂單增三成、春節熱賣 - 經濟日報", "link": "https://news.google.com/rss/articles/CBMiX0FVX3lxTE1jWUM1Y0N1d1Y5Y24wSkdIc2Y0eUdqT0RpdEp5VlNOa3FQWENncE5uSmRUczVwNGUwZUNRX2lzSENwenJ5ZVVJNXNaYk45eW9rMl85T0R4VEg2MlVZb0pr0gFfQVVfeXFMTWNZQzVjQ3V3VjljbjBKR0hzZjR5R2pPRGl0SnlWU05rcVBYQ2dwTm5KZFRzNXA0ZTBlQ1FfaXNIQ3B6cnllVUk1c1piTjl5b2syXzlPRHhUSDYyVVlvSms?oc=5", "date": "Tue, 13 Oct 2026", "found": "10/14 12:31"}, {"title": "ITF旅展早鳥票開賣！旅行社推線上搶5000折扣、抽來回機票 - 翻爆", "link": "https://news.google.com/rss/articles/CBMia0FVX3lxTFBtZkZpeTdQSkV4SGg1N3RnTlluZUpUaWNrZWRYT25OY1VzTTlsTklpUXJ4UVcxel9RdzdOTnpMdUljRjE2Q2ZpVENvVGtHck5Nelc4VHVoOHJPSVdtQmc2Sk1OdXBUYTIwSXI0?oc=5", "date": "Tue, 13 Oct 2026", "found": "10/14 12:31"}, {"title": "ITF旅展｜機票買1送1、春節出國折1萬 大巨蛋第一排住宿、餐券4折起 - 知新聞", "link": "https://news.google.com/rss/articles/CBMib0FVX3lxTE1ickdFcTBIaEE1OHhzUHBkXy13RGVfejU4ZmNtV0VDYzF5Uy1Ra2dXLWo4SjFPSHRkX2N4VUZQVFpWVWxGcWU3UUJWbXJoNFdnTVhSM0ptOW0tSEZyMjA1S2I4LUdWbE00bm1YakRqdw?oc=5", "date": "Sun, 11 Oct 2026", "found": "10/14 12:31"}, {"title": "ITF旅展11月登場！日本館規模創新高、12家航空參展 門票75折限時2天 - Yahoo新聞", "link": "https://news.google.com/rss/articles/CBMihANBVV95cUxORmlNUGZqNFpEVHNXZ2paS1RqQlNtWTJmRUs4Q192TDNMS3E4LWc5S2Q1QkVVN1Q4ZzhWYVdQaWd0d1doQ1U4ZjA4eDZKZkxreHkxUzFiODhERHI5SEFFTENqdWs2dzExc1BqUDloVU5xOWNXYXhTRWxnSU1TbHloQjFKaFVqaWZjMEs3X2t3Ti1ITmxBYjNja2ZCamZpZS1EQTlQYkFZTUJxTlh6VW01M1RYeTlPbU5JSlRQUnBlWTBBSUtKbnRuRDFaV0tKZk93cl9ZVmRQQ0hJd28xR0s0MUFWWjZzdzNZNVF1aE9jdzlDM0JYLU1yZU1fbTJ5NXBEUWNiUXZ1LWNEVUM3OExobU4zQUM4TVZadWVkbllZSnREMk5UU0lVeEI0eW1QRHpVTTBqWldjN0FsMjV4WngyTm9Dcll4cXE0N1BHRWp6Ylc5RXNqVDV1anZkVkhRME1CQXo3Ny1UcjE1UXR5ZmZvODEtMFVCZGtXNUlfY2xicldSTno5?oc=5", "date": "Tue, 13 Oct 2026", "found": "10/14 12:31"}, {"title": "出國免萬元行程開搶！旅行社ITF線上旅展開跑，關西、釜山、新馬２萬元有找 - 食尚玩家", "link": "https://news.google.com/rss/articles/CBMiV0FVX3lxTE54SmtTTjNDRUtTWnFFMTYzWkxjbHUtamI0SS1IaklxTzFCTDRpQWJmamg1dElfRFRvYTVta01BajBzU3VtQmd3MUgwbzdueU1fU2FvQkhHONIBXEFVX3lxTE84bmtmT1ZBUFJiUFJGQVNpR0xDRGtCZllYWUdtdnAwdjU0UG90OVBzM3BiUUF4UGxmMlRoX01oa0dqQ2ZJMWZhZHNGaEV2d1ltcXNzNXpVUW9LOHhl?oc=5", "date": "Mon, 12 Oct 2026", "found": "10/14 12:31"}, {"title": "2026年ITF線上旅展開跑！雄獅冬季旅遊訂單增三成：沖繩自由行萬元有找，極光、跨年提早半年卡位 - XINMEDIA欣傳媒", "link": "https://news.google.com/rss/articles/CBMiUEFVX3lxTE9UX0M5VU1vVjJ3ZDQ0aDlsQVZycnZQUm5VVFU3UURWWEVvMHZMeHNwWjRQeTRjUkV6VGgxckdaSENtb0VIZUxjSWlHSzZDZ3I3?oc=5", "date": "Mon, 12 Oct 2026", "found": "10/14 12:31"}]};
+const $ = id => document.getElementById(id);
+const fmt = n => n.toLocaleString('zh-TW');
+const wan = n => (n/10000).toFixed(2);
+const css = v => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+const P = D.pax;
+const name = {}; const isL = {};
+D.airlines.forEach(a => { name[a.code] = a.name; isL[a.code] = a.lcc; });
+
+// runs → 每家最低、每家每天
+const runs = [...new Set(D.rows.map(r => r[0]))].sort();
+const minBy = {};   // run → code → {price, dep}
+const grid = {};    // run → code → dep → price
+D.rows.forEach(([run, code, dep, price]) => {
+  ((minBy[run] ??= {})[code] && minBy[run][code].price <= price) || (minBy[run][code] = {price, dep});
+  ((grid[run] ??= {})[code] ??= {})[dep] = price;
+});
+const last = runs[runs.length - 1], first = runs[0];
+
+$('sub').textContent = `桃園 ⇄ 成田・${D.paxNote}・直飛・7 天 6 夜・3/1–3/14 出發｜更新 ${D.built}｜下次掃描 ${D.next}｜已掃 ${runs.length} 次`;
+
+if (!runs.length) { $('tiles').innerHTML = '<div class="tile">還沒有資料。</div>'; throw 0; }
+
+// ── 頂部數字
+function groupMin(run, lcc) {
+  let b = null;
+  for (const [c, v] of Object.entries(minBy[run] || {})) if (isL[c] === lcc && (!b || v.price < b.price)) b = {...v, code: c};
+  return b;
+}
+function tile(k, b, b0) {
+  if (!b) return `<div class="tile"><div class="k">${k}</div><div class="v">—</div></div>`;
+  let d = '開始追蹤';
+  if (b0 && runs.length > 1) {
+    const diff = (b.price - b0.price) * P;
+    d = diff < 0 ? `<span class="down">▼ ${fmt(-diff)}</span> 比開始追蹤` : diff > 0 ? `<span class="up">▲ ${fmt(diff)}</span> 比開始追蹤` : '跟開始追蹤一樣';
+  }
+  const m = b.dep.slice(5).replace('-', '/').replace(/^0/, '').replace('/0', '/');
+  return `<div class="tile"><div class="k">${k}</div><div class="v">${fmt(b.price * P)}</div>
+   <div class="d">${name[b.code]}・${m} 出發・每人 ${fmt(b.price)}</div><div class="d">${d}</div></div>`;
+}
+let allTime = null;
+D.rows.forEach(([run, code, dep, price]) => { if (!allTime || price < allTime.price) allTime = {price, code, run}; });
+$('tiles').innerHTML = tile('廉航最低（5 人）', groupMin(last, true), groupMin(first, true))
+  + tile('傳統航空最低（5 人）', groupMin(last, false), groupMin(first, false))
+  + `<div class="tile"><div class="k">追蹤以來最低（5 人）</div><div class="v">${fmt(allTime.price * P)}</div>
+     <div class="d">${name[allTime.code]}・${allTime.run.slice(5)} 掃到</div></div>`;
+
+// ── 走勢圖
+const pick = $('pick');
+pick.innerHTML = '<option value="__g">廉航 vs 傳統航空（各自最低）</option>' +
+  D.airlines.filter(a => runs.some(r => minBy[r][a.code])).map(a => `<option value="${a.code}">${a.name}</option>`).join('');
+pick.onchange = drawTrend;
+function seriesFor(v) {
+  if (v === '__g') return [
+    {label: '廉航最低', color: '--s1', pts: runs.map(r => { const b = groupMin(r, true); return b && {run: r, price: b.price, who: name[b.code], dep: b.dep}; })},
+    {label: '傳統航空最低', color: '--s2', pts: runs.map(r => { const b = groupMin(r, false); return b && {run: r, price: b.price, who: name[b.code], dep: b.dep}; })}];
+  return [{label: name[v], color: '--s1', pts: runs.map(r => { const b = minBy[r][v]; return b && {run: r, price: b.price, who: name[v], dep: b.dep}; })}];
+}
+const ts = s => new Date(s.replace(' ', 'T')).getTime();
+function drawTrend() {
+  const S = seriesFor(pick.value);
+  $('legend').innerHTML = S.length > 1 ? S.map(s => `<span><i style="background:var(${s.color})"></i>${s.label}</span>`).join('') : '';
+  const box = $('trend'); box.querySelectorAll('svg').forEach(e => e.remove());
+  const W = Math.max(320, box.clientWidth), H = 260, L = 64, R = 92, T = 12, B = 30;
+  const all = S.flatMap(s => s.pts.filter(Boolean).map(p => p.price * P));
+  let lo = Math.min(...all), hi = Math.max(...all);
+  const pad = Math.max((hi - lo) * 0.15, 2000); lo = Math.max(0, lo - pad); hi += pad;
+  const t0 = ts(first), t1 = Math.max(ts(last), t0 + 3600e3);
+  const x = t => L + (W - L - R) * (runs.length < 2 ? 0.5 : (ts(t) - t0) / (t1 - t0));
+  const y = v => T + (H - T - B) * (1 - (v - lo) / (hi - lo));
+  let g = '';
+  for (let i = 0; i <= 4; i++) {
+    const v = lo + (hi - lo) * i / 4, yy = y(v);
+    g += `<line x1="${L}" x2="${W - R}" y1="${yy}" y2="${yy}" stroke="var(--grid)"/>` +
+         `<text x="${L - 8}" y="${yy + 4}" text-anchor="end" font-size="11" fill="var(--ink3)">${fmt(Math.round(v / 100) * 100)}</text>`;
+  }
+  const days = [...new Set(runs.map(r => r.slice(0, 10)))];
+  days.forEach(d => { const xx = x(runs.find(r => r.startsWith(d)));
+    g += `<text x="${xx}" y="${H - 8}" text-anchor="middle" font-size="11" fill="var(--ink3)">${+d.slice(5, 7)}/${+d.slice(8)}</text>`; });
+  S.forEach(s => {
+    const pts = s.pts.filter(Boolean);
+    if (pts.length > 1) g += `<path d="${pts.map((p, i) => (i ? 'L' : 'M') + x(p.run) + ' ' + y(p.price * P)).join('')}" fill="none" stroke="var(${s.color})" stroke-width="2" stroke-linejoin="round"/>`;
+    pts.forEach(p => g += `<circle cx="${x(p.run)}" cy="${y(p.price * P)}" r="${pts.length > 1 ? 3 : 5}" fill="var(${s.color})" stroke="var(--surface)" stroke-width="2"/>`);
+    const e = pts[pts.length - 1];
+    if (e) g += `<text x="${x(e.run) + 10}" y="${y(e.price * P) + 4}" font-size="12" fill="var(--ink2)">${S.length > 1 ? s.label + ' ' : ''}${wan(e.price * P)} 萬</text>`;
+  });
+  g += `<line id="xh" y1="${T}" y2="${H - B}" stroke="var(--ink3)" stroke-dasharray="3 3" visibility="hidden"/>`;
+  g += `<rect x="${L}" y="${T}" width="${W - L - R}" height="${H - T - B}" fill="transparent" id="hit"/>`;
+  box.insertAdjacentHTML('beforeend', `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="票價走勢">${g}</svg>`);
+  const svg = box.querySelector('svg'), tip = $('tip1'), xh = svg.querySelector('#xh');
+  svg.querySelector('#hit').onmousemove = ev => {
+    const rc = svg.getBoundingClientRect(), mx = (ev.clientX - rc.left) * W / rc.width;
+    let best = runs[0]; runs.forEach(r => { if (Math.abs(x(r) - mx) < Math.abs(x(best) - mx)) best = r; });
+    xh.setAttribute('x1', x(best)); xh.setAttribute('x2', x(best)); xh.setAttribute('visibility', 'visible');
+    tip.innerHTML = `<b>${best.slice(5)}</b>` + S.map(s => { const p = s.pts[runs.indexOf(best)];
+      return p ? `<div><i style="display:inline-block;width:10px;height:3px;background:var(${s.color});vertical-align:middle;margin-right:6px"></i>${p.who} ${fmt(p.price * P)}（${+p.dep.slice(5,7)}/${+p.dep.slice(8)} 出發）</div>` : ''; }).join('');
+    tip.style.display = 'block';
+    const px = x(best) * rc.width / W;
+    tip.style.left = Math.min(px + 12, rc.width - tip.offsetWidth) + 'px'; tip.style.top = '8px';
+  };
+  svg.querySelector('#hit').onmouseleave = () => { tip.style.display = 'none'; xh.setAttribute('visibility', 'hidden'); };
+}
+drawTrend(); addEventListener('resize', drawTrend);
+
+// ── 出發日格子
+const deps = [...new Set(D.rows.filter(r => r[0] === last).map(r => r[2]))].sort();
+const G = grid[last];
+const codes = Object.keys(G).sort((a, b) => minBy[last][a].price - minBy[last][b].price);
+const vals = codes.flatMap(c => Object.values(G[c])).sort((a, b) => a - b);
+const qs = [1, 2, 3, 4, 5].map(i => vals[Math.floor(vals.length * i / 6)]);
+const shade = v => ['--q1','--q2','--q3','--q4','--q5','--q6'][qs.filter(q => v > q).length];
+let h = '<tr><th>航空</th>' + deps.map(d => `<th style="text-align:center">${+d.slice(5,7)}/${+d.slice(8)}</th>`).join('') + '</tr>';
+codes.forEach(c => {
+  const m = minBy[last][c].price;
+  h += `<tr><td>${name[c]}<span class="tag">${isL[c] ? '廉航' : '傳統'}</span></td>` + deps.map(d => {
+    const v = G[c][d]; if (!v) return '<td class="c" style="color:var(--ink3)">—</td>';
+    const sv = shade(v), dark = ['--q4','--q5','--q6'].includes(sv) !== (document.documentElement.dataset.theme === 'dark' || matchMedia('(prefers-color-scheme: dark)').matches);
+    return `<td class="c${v === m ? ' best' : ''}" style="background:var(${sv});color:${dark ? '#fff' : '#0b0b0b'}" title="${name[c]} ${+d.slice(5,7)}/${+d.slice(8)} 出發：5 人約 ${fmt(v * P)} 元（每人 ${fmt(v)}）">${wan(v * P)}</td>`;
+  }).join('') + '</tr>';
+});
+$('heat').innerHTML = h;
+$('scale').innerHTML = '便宜 ' + ['--q1','--q2','--q3','--q4','--q5','--q6'].map(v => `<span class="sw" style="background:var(${v})"></span>`).join('') + ' 貴';
+
+// ── 各家表格
+const allMin = {}; D.rows.forEach(([run, c, dep, p]) => { if (!allMin[c] || p < allMin[c]) allMin[c] = p; });
+let t = '<tr><th>航空</th><th>5 人估計</th><th>每人來回</th><th>最便宜出發日</th><th>比開始追蹤</th><th>歷史最低（5 人）</th></tr>';
+codes.forEach(c => {
+  const b = minBy[last][c], b0 = minBy[first][c];
+  let d = '—'; if (b0 && runs.length > 1) { const x = (b.price - b0.price) * P; d = x < 0 ? `<span class="down">▼ ${fmt(-x)}</span>` : x > 0 ? `<span class="up">▲ ${fmt(x)}</span>` : '持平'; }
+  t += `<tr><td>${name[c]}<span class="tag">${isL[c] ? '廉航' : '傳統'}</span></td><td>${fmt(b.price * P)}</td><td>${fmt(b.price)}</td>
+    <td>${+b.dep.slice(5,7)}/${+b.dep.slice(8)}</td><td>${d}</td><td>${fmt(allMin[c] * P)}</td></tr>`;
+});
+$('tbl').innerHTML = t;
+
+// ── 新聞
+$('news').innerHTML = D.news.length ? D.news.map(n => `<li><span class="dt">${n.found || ''}</span><a href="${n.link}" target="_blank" rel="noopener">${n.title.replace(/</g,'&lt;')}</a></li>`).join('')
+  : '<li style="color:var(--ink3)">還沒有新的。</li>';
+</script></body></html>
